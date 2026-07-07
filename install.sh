@@ -13,18 +13,10 @@ source lib/functions.sh
 
 show_banner
 
-info "Initializing installer..."
+run_system_checks
 
-sleep 1
-
-line
-
-success "Framework loaded."
-
-line
+success "Framework loaded successfully."
 
 echo
-
 echo "Ready to continue."
-
 echo
