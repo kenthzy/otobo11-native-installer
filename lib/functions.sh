@@ -52,6 +52,7 @@ run_system_checks() {
     check_apache
     check_mariadb
     check_perl
+    check_otobo
 
     line
 }
@@ -164,5 +165,17 @@ check_perl() {
     PERL_VERSION=$(perl -e 'print $^V')
 
     success "Perl installed (${PERL_VERSION})."
+
+}
+
+check_otobo() {
+
+    info "Checking existing OTOBO installation..."
+
+    if [[ -d /opt/otobo ]]; then
+        warning "Existing OTOBO installation detected at /opt/otobo."
+    else
+        success "No existing OTOBO installation detected."
+    fi
 
 }
