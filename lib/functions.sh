@@ -54,6 +54,16 @@ check_os() {
 
     info "Checking operating system..."
 
-    # Code to detect Ubuntu will go here
+    if [[ ! -f /etc/os-release ]]; then
+        error "Unable to determine operating system."
+    fi
+
+    source /etc/os-release
+
+    if [[ "$ID" != "ubuntu" ]]; then
+        error "Unsupported operating system: $PRETTY_NAME"
+    fi
+
+    success "Operating System: $PRETTY_NAME"
 
 }
