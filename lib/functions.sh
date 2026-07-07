@@ -46,6 +46,7 @@ run_system_checks() {
 
     check_root
     check_os
+    check_internet
 
     line
 }
@@ -65,5 +66,17 @@ check_os() {
     fi
 
     success "Operating System: $PRETTY_NAME"
+
+}
+
+check_internet() {
+
+    info "Checking internet connection..."
+
+    if ping -c 1 -W 2 8.8.8.8 > /dev/null 2>&1; then
+        success "Internet connection available."
+    else
+        error "No internet connection detected."
+    fi
 
 }
