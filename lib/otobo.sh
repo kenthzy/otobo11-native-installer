@@ -154,8 +154,16 @@ setup_database() {
 write_config() {
     local creds_file="/root/.otobo_db_credentials"
     local config_file="/opt/otobo/Kernel/Config/Files/AAInstaller.pm"
+    local dist_file="/opt/otobo/Kernel/Config.pm.dist"
+    local pm_file="/opt/otobo/Kernel/Config.pm"
 
-    info "Writing OTOBO database configuration..."
+    info "Writing OTOBO configuration files..."
+
+    if [[ -f "$dist_file" && ! -f "$pm_file" ]]; then
+        cp "$dist_file" "$pm_file"
+        chmod 644 "$pm_file"
+        info "Created Kernel/Config.pm from Config.pm.dist template."
+    fi
 
     if [[ ! -f "$creds_file" ]]; then
         register_result "OTOBO_Config" "FAIL" "Credentials file not found"
