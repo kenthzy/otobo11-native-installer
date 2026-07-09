@@ -1,0 +1,5 @@
+# ShellCheck configuration for OTOBO 11 Native Installer
+# https://www.shellcheck.net/wiki/
+
+# Cross-file variables from sourced modules (colors.sh, /etc/os-release, etc.)
+disable=SC2154,SC1091

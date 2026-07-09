@@ -65,7 +65,7 @@ check_os() {
 check_internet() {
     info "Checking internet connection..."
 
-    if ping -c 1 -W 2 8.8.8.8 > /dev/null 2>&1; then
+    if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
         register_result "Internet" "PASS" "Connectivity verified (8.8.8.8)"
         success "Internet connection available."
     else
@@ -116,7 +116,7 @@ check_disk() {
 check_apache() {
     info "Checking Apache..."
 
-    if ! command -v apache2 > /dev/null 2>&1; then
+    if ! command -v apache2 >/dev/null 2>&1; then
         register_result "Apache" "INFO" "Not installed (will be installed)"
         warning "Apache is not installed."
         return
@@ -134,7 +134,7 @@ check_apache() {
 check_mariadb() {
     info "Checking MariaDB..."
 
-    if ! command -v mariadb > /dev/null 2>&1 && ! command -v mysql > /dev/null 2>&1; then
+    if ! command -v mariadb >/dev/null 2>&1 && ! command -v mysql >/dev/null 2>&1; then
         register_result "MariaDB" "INFO" "Not installed (will be installed)"
         warning "MariaDB is not installed."
         return
@@ -152,7 +152,7 @@ check_mariadb() {
 check_perl() {
     info "Checking Perl..."
 
-    if ! command -v perl > /dev/null 2>&1; then
+    if ! command -v perl >/dev/null 2>&1; then
         register_result "Perl" "INFO" "Not installed (will be installed)"
         warning "Perl is not installed."
         return
@@ -224,7 +224,10 @@ validation_summary() {
         case "$status" in
             PASS) ((pass_count++)) ;;
             WARN) ((warn_count++)) ;;
-            FAIL) ((fail_count++)); has_fail=1 ;;
+            FAIL)
+                ((fail_count++))
+                has_fail=1
+                ;;
             INFO) ((info_count++)) ;;
             SKIP) ((skip_count++)) ;;
         esac

@@ -31,6 +31,27 @@ if ! validation_summary; then
     fi
 fi
 
+line
+info "Phase 3: Package Installation"
+line
+
+info "Updating package lists..."
+apt-get update
+
+source lib/apache.sh
+install_apache
+
+source lib/mariadb.sh
+install_mariadb
+
+source lib/perl.sh
+install_perl
+
+source lib/firewall.sh
+configure_firewall
+
 echo
-success "System validation complete. Ready for package installation."
+success "Package installation complete."
+echo "Apache, MariaDB, Perl modules, and firewall are ready."
+echo "Proceeding to Phase 4 — OTOBO Installation."
 echo

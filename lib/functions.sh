@@ -52,6 +52,6 @@ confirm() {
 
     case "${answer:0:1}" in
         [Yy]) return 0 ;;
-        *)    return 1 ;;
+        *) return 1 ;;
     esac
 }

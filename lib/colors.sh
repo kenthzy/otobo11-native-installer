@@ -2,10 +2,12 @@
 
 #############################################
 # OTOBO 11 Native Installer
-# Automated by System Admin Kenneth
+# ANSI Color Definitions
+# Sourced by all modules — disable SC2034
+# for cross-file variable usage.
 #############################################
 
-# Colors
+# shellcheck disable=SC2034
 
 RED="\033[0;31m"
 GREEN="\033[0;32m"

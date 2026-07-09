@@ -6,7 +6,7 @@ show_banner() {
 
     echo -e "${LIGHT_BLUE}"
 
-    cat << 'EOF'
+    cat <<'EOF'
 ============================================================
 
                  OTOBO 11 NATIVE INSTALLER
