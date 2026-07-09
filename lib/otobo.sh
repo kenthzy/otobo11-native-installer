@@ -113,10 +113,8 @@ set_permissions() {
     chown -R otobo:www-data /opt/otobo
     find /opt/otobo -type d -exec chmod 755 {} \;
     find /opt/otobo -type f -not -executable -exec chmod 644 {} \;
-    chmod 755 /opt/otobo/bin/* 2>/dev/null
-    true
-    chmod 755 /opt/otobo/var/httpd/htdocs/*.pl 2>/dev/null
-    true
+    chmod 755 /opt/otobo/bin/* 2>/dev/null || true
+    chmod 755 /opt/otobo/var/httpd/htdocs/*.pl 2>/dev/null || true
 
     register_result "OTOBO_Permissions" "PASS" "File permissions set (otobo:www-data)"
     success "OTOBO file permissions configured."
