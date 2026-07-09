@@ -170,6 +170,14 @@ write_config() {
 		use warnings;
 		use utf8;
 
+		sub new {
+		    my \$type = shift;
+		    my \$Self = {};
+		    bless(\$Self, \$type);
+		    \$Self->Load();
+		    return \$Self;
+		}
+
 		sub Load {
 		    my \$Self = shift;
 
