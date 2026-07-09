@@ -38,8 +38,9 @@ download_otobo() {
         error "Could not find extracted OTOBO directory."
     fi
 
-    mkdir -p /opt/otobo /opt/otobo/Kernel/Config/Files
+    mkdir -p /opt/otobo
     mv "$otobo_dir"/* /opt/otobo/
+    mkdir -p /opt/otobo/Kernel/Config/Files
     rm -f /tmp/otobo-latest-11.0.tar.gz
     cd /
 
