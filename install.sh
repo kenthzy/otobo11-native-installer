@@ -52,6 +52,6 @@ configure_firewall
 
 echo
 success "Package installation complete."
-echo "Apache, MariaDB, Perl modules, and firewall are ready."
-echo "Proceeding to Phase 4 — OTOBO Installation."
-echo
+
+source lib/otobo.sh
+install_otobo
