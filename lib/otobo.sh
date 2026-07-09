@@ -112,7 +112,7 @@ set_permissions() {
     info "Setting OTOBO file permissions..."
 
     chown -R otobo:www-data /opt/otobo
-    find /opt/otobo -type d -exec chmod 755 {} \;
+    find /opt/otobo -type d -exec chmod 775 {} \;
     find /opt/otobo -type f -not -executable -exec chmod 644 {} \;
     chmod 755 /opt/otobo/bin/* 2>/dev/null || true
     chmod 755 /opt/otobo/var/httpd/htdocs/*.pl 2>/dev/null || true
@@ -231,9 +231,9 @@ restart_services() {
 show_completion() {
     local server_ip
 
-    server_ip=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7}')
+    server_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     if [[ -z "$server_ip" ]]; then
-        server_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        server_ip=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7}')
     fi
     if [[ -z "$server_ip" ]]; then
         server_ip="<your-server-ip>"
