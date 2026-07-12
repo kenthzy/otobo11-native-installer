@@ -9,7 +9,7 @@ show_banner() {
     cat <<'EOF'
 ============================================================
 
-                 OTOBO 11 NATIVE INSTALLER
+                        OTOBOSuite
 
                      Version 1.0
 

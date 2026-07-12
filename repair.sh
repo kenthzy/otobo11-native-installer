@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #############################################
-# OTOBO 11 Native Installer
+# OTOBOSuite - OTOBO Management Suite
 # Automatic Repair Module
 # Run: sudo ./repair.sh
 #      sudo ./repair.sh --check

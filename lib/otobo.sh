@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #############################################
-# OTOBO 11 Native Installer
+# OTOBOSuite - OTOBO Management Suite
 # OTOBO Application Module
 #############################################
 
@@ -243,7 +243,7 @@ show_completion() {
 
     echo
     echo -e "${BOLD}============================================================${NC}"
-    echo -e "${BOLD}$(printf '%*s' 28 "")OTOBO 11 INSTALLATION COMPLETED${NC}"
+    echo -e "${BOLD}$(printf '%*s' 33 "")INSTALLATION COMPLETED${NC}"
     echo -e "${BOLD}============================================================${NC}"
     echo
     echo -e " ${BOLD}URL:${NC}"
@@ -268,7 +268,7 @@ show_completion() {
     pause
 
     echo
-    echo -e "${GREEN}✔${NC} ${BOLD}Thank you for using the OTOBO 11 Native Installer.${NC}"
+    echo -e "${GREEN}✔${NC} ${BOLD}Thank you for using OTOBOSuite.${NC}"
     echo -e "${GREEN}✔${NC} Automated by System Admin Kenneth."
     echo
     success "Installer finished successfully."

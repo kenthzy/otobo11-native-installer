@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #############################################
-# OTOBO 11 Native Installer
+# OTOBOSuite - OTOBO Management Suite
 # ANSI Color Definitions
 # Sourced by all modules — disable SC2034
 # for cross-file variable usage.

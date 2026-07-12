@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #############################################
-# OTOBO 11 Native Installer
+# OTOBOSuite - OTOBO Management Suite
 # Firewall Configuration Module
 #############################################
 
