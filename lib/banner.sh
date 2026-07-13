@@ -2,11 +2,11 @@
 
 show_banner() {
 
-    [[ -n "$TERM" ]] && clear
+	[[ -n "$TERM" ]] && clear
 
-    echo -e "${LIGHT_BLUE}"
+	echo -e "${LIGHT_BLUE}"
 
-    cat <<'EOF'
+	cat <<'EOF'
 ============================================================
 
                         OTOBOSuite
@@ -27,6 +27,6 @@ show_banner() {
 ============================================================
 EOF
 
-    echo -e "${NC}"
+	echo -e "${NC}"
 
 }

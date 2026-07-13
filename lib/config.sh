@@ -10,23 +10,23 @@
 CONFIG_FILE="/etc/otobo-installer.conf"
 
 load_config() {
-    if [[ -f "$CONFIG_FILE" ]]; then
-        # shellcheck disable=SC1090
-        source "$CONFIG_FILE"
-        return 0
-    fi
-    return 1
+	if [[ -f "$CONFIG_FILE" ]]; then
+		# shellcheck disable=SC1090
+		source "$CONFIG_FILE"
+		return 0
+	fi
+	return 1
 }
 
 config_value() {
-    local key="$1"
-    local default="$2"
-    local val
+	local key="$1"
+	local default="$2"
+	local val
 
-    val=$(eval "echo \${${key}:-}" 2>/dev/null)
-    if [[ -n "$val" ]]; then
-        echo "$val"
-    else
-        echo "$default"
-    fi
+	val=$(eval "echo \${${key}:-}" 2>/dev/null)
+	if [[ -n "$val" ]]; then
+		echo "$val"
+	else
+		echo "$default"
+	fi
 }
