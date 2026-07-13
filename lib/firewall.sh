@@ -1,17 +1,10 @@
 #!/usr/bin/env bash
 
-#############################################
-# OTOBOSuite - OTOBO Management Suite
-# Firewall Configuration Module
-#############################################
-
 configure_firewall() {
 	info "Configuring firewall..."
 
 	if ! command -v ufw >/dev/null 2>&1; then
-		info "Installing UFW..."
-		apt-get install -y ufw
-		success "UFW installed."
+		pkg_install ufw
 	fi
 
 	ufw allow OpenSSH

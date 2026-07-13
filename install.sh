@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/pkg.sh
+source "$SCRIPT_DIR/lib/pkg.sh"
 # shellcheck source=lib/config.sh
 source "$SCRIPT_DIR/lib/config.sh"
 # shellcheck source=lib/mariadb.sh
@@ -24,10 +26,55 @@ source "$SCRIPT_DIR/lib/otobo.sh"
 source "$SCRIPT_DIR/lib/ssl.sh"
 # shellcheck source=lib/backup.sh
 source "$SCRIPT_DIR/lib/backup.sh"
+# shellcheck source=lib/firewall.sh
+source "$SCRIPT_DIR/lib/firewall.sh"
+# shellcheck source=lib/security.sh
+source "$SCRIPT_DIR/lib/security.sh"
 
-load_config
+UNATTENDED=0
+
+parse_args() {
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--unattended | -u)
+			UNATTENDED=1
+			shift
+			;;
+		--config | -c)
+			if [[ -n "${2:-}" ]]; then
+				CONFIG_FILE="$2"
+				shift 2
+			else
+				die "Missing config file path after --config"
+			fi
+			;;
+		*)
+			die "Unknown option: $1"
+			;;
+		esac
+	done
+}
+
+parse_args "$@"
+
+if [[ "$UNATTENDED" -eq 1 ]]; then
+	if ! load_config "$CONFIG_FILE"; then
+		die "Config file not found: $CONFIG_FILE"
+	fi
+	info "Running in unattended mode using $CONFIG_FILE"
+	if ! config_is_complete "FQDN" "DB_ENGINE" "DB_NAME" "DB_USER" "DB_PASS" "ADMIN_USER" "ADMIN_PASS"; then
+		die "Config file is incomplete. Required keys: FQDN, DB_ENGINE, DB_NAME, DB_USER, DB_PASS, ADMIN_USER, ADMIN_PASS"
+	fi
+else
+	load_config "$CONFIG_FILE" || true
+fi
+
+# ===========================================
+# Prompt Functions
+# ===========================================
 
 prompt_db_engine() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
 	echo ""
 	echo "========================================"
 	echo "  Database Engine Selection"
@@ -55,6 +102,7 @@ prompt_db_engine() {
 }
 
 prompt_web_server() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
 	echo ""
 	echo "========================================"
 	echo "  Web Server Selection"
@@ -73,6 +121,7 @@ prompt_web_server() {
 }
 
 prompt_db_credentials() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
 	echo ""
 	echo "========================================"
 	echo "  Database Credentials"
@@ -90,6 +139,7 @@ prompt_db_credentials() {
 }
 
 prompt_admin_user() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
 	echo ""
 	echo "========================================"
 	echo "  OTOBO Admin User"
@@ -107,6 +157,7 @@ prompt_admin_user() {
 }
 
 prompt_ssl() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
 	echo ""
 	echo "========================================"
 	echo "  SSL Configuration"
@@ -130,6 +181,7 @@ prompt_ssl() {
 }
 
 prompt_ai() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
 	echo ""
 	echo "========================================"
 	echo "  Open Ticket AI Integration"
@@ -145,15 +197,39 @@ prompt_ai() {
 		local model_choice
 		read -r -p "Select model [1]: " model_choice
 		case "${model_choice:-1}" in
-		1) AI_MODEL="mini LM" ;;
+		1) AI_MODEL="minilm" ;;
 		2) AI_MODEL="bert" ;;
 		3) AI_MODEL="skip" ;;
-		*) AI_MODEL="mini LM" ;;
+		*) AI_MODEL="minilm" ;;
 		esac
 		AI_QUEUE=$(prompt_with_default "Queue to monitor" "${AI_QUEUE:-Raw}")
 		AI_POLL_INTERVAL=$(prompt_with_default "Poll interval (seconds)" "${AI_POLL_INTERVAL:-60}")
 	else
 		INSTALL_AI="no"
+	fi
+	echo ""
+}
+
+prompt_hardening() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
+	echo ""
+	echo "========================================"
+	echo "  Security Hardening"
+	echo "========================================"
+	if prompt_yes_no "Apply security hardening? (firewall, fail2ban, auto-updates)"; then
+		INSTALL_HARDENING="yes"
+	fi
+	echo ""
+}
+
+prompt_monitoring() {
+	[[ "$UNATTENDED" -eq 1 ]] && return
+	echo ""
+	echo "========================================"
+	echo "  Monitoring Stack"
+	echo "========================================"
+	if prompt_yes_no "Install monitoring? (Prometheus node_exporter, health checks)"; then
+		INSTALL_MONITORING="yes"
 	fi
 	echo ""
 }
@@ -175,6 +251,8 @@ prompt_db_credentials
 prompt_admin_user
 prompt_ssl
 prompt_ai
+prompt_hardening
+prompt_monitoring
 
 echo ""
 echo "========================================"
@@ -187,11 +265,15 @@ echo "  Database:       $DB_NAME"
 echo "  DB User:        $DB_USER"
 echo "  SSL:            $SSL_MODE"
 echo "  Install AI:     $INSTALL_AI"
+echo "  Hardening:      $INSTALL_HARDENING"
+echo "  Monitoring:     $INSTALL_MONITORING"
 echo "========================================"
 
-if ! prompt_yes_no "Proceed with installation?" "y"; then
-	echo "Installation cancelled."
-	exit 0
+if [[ "$UNATTENDED" -eq 0 ]]; then
+	if ! prompt_yes_no "Proceed with installation?" "y"; then
+		echo "Installation cancelled."
+		exit 0
+	fi
 fi
 
 save_config
@@ -202,6 +284,7 @@ info "Starting OTOBO installation..."
 if [ "$DB_ENGINE" = "postgresql" ]; then
 	install_postgresql
 	configure_postgresql_db "$DB_NAME" "$DB_USER" "$DB_PASS"
+	optimize_postgresql
 else
 	install_mariadb
 	configure_mariadb_db "$DB_NAME" "$DB_USER" "$DB_PASS"
@@ -223,11 +306,7 @@ dispatch_web_server_install "$WEB_SERVER"
 
 # 6. SSL
 if [ "$SSL_MODE" != "none" ]; then
-	if [ "$SSL_MODE" = "letsencrypt" ]; then
-		configure_ssl "$WEB_SERVER" "$FQDN" "$SSL_EMAIL" "letsencrypt"
-	else
-		configure_ssl "$WEB_SERVER" "$FQDN" "" "self-signed"
-	fi
+	configure_ssl "$SSL_MODE"
 fi
 
 # 7. Configure web server
@@ -241,7 +320,19 @@ if [ "$INSTALL_AI" = "yes" ]; then
 	install_ai_module "${OTOBO_ROOT:-/opt/otobo}" "${OTOBO_USER:-otobo}" "$FQDN" "$API_PASS" "$AI_MODEL" "$AI_QUEUE" "$AI_POLL_INTERVAL"
 fi
 
-# 9. Backup setup
+# 9. Security hardening
+if [ "${INSTALL_HARDENING:-no}" = "yes" ]; then
+	run_security_hardening
+fi
+
+# 10. Monitoring
+if [ "${INSTALL_MONITORING:-no}" = "yes" ]; then
+	# shellcheck source=lib/monitoring.sh
+	source "$SCRIPT_DIR/lib/monitoring.sh"
+	install_monitoring_stack
+fi
+
+# 11. Backup setup
 setup_backup_dir
 
 validation_summary || die "Installation completed with errors"

@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create tarball
+        run: make tarball
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: OTOBOSuite ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+          files: OTOBOSuite-*.tar.gz

@@ -354,7 +354,7 @@ setup_letsencrypt() {
 	info "Installing Certbot via snap..."
 
 	if ! command -v snap >/dev/null 2>&1; then
-		apt-get install -y snapd
+		pkg_install snapd
 		snap wait system seed.loaded 2>/dev/null || true
 	fi
 
@@ -489,6 +489,18 @@ show_mode_menu() {
 	echo
 }
 
+configure_ssl() {
+	local ssl_type="${1:-self-signed}"
+
+	detect_webserver
+
+	if [ "$ssl_type" = "letsencrypt" ]; then
+		setup_letsencrypt
+	else
+		setup_self_signed
+	fi
+}
+
 main() {
 	check_root
 
@@ -539,4 +551,6 @@ main() {
 	echo
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+	main "$@"
+fi

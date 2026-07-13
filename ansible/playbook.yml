@@ -1,0 +1,60 @@
+---
+- name: Deploy OTOBOSuite
+  hosts: all
+  become: yes
+  vars:
+    otobo_project_dir: /opt/OTOBOSuite
+    config_file: /etc/otobo-installer.conf
+
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - git
+          - curl
+          - wget
+          - openssl
+        state: present
+        update_cache: yes
+
+    - name: Clone OTOBOSuite repository
+      git:
+        repo: https://github.com/kenthzy/OTOBOSuite.git
+        dest: "{{ otobo_project_dir }}"
+        version: main
+        force: yes
+
+    - name: Create unattended config file
+      copy:
+        dest: "{{ config_file }}"
+        content: |
+          FQDN={{ ansible_fqdn }}
+          DB_ENGINE=mariadb
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_NAME=otobo
+          DB_USER=otobo
+          DB_PASS={{ lookup('password', '/dev/null chars=ascii_letters,digits length=24') }}
+          WEB_SERVER=apache
+          SSL_MODE=none
+          INSTALL_AI=no
+          ADMIN_USER=root@localhost
+          ADMIN_PASS={{ lookup('password', '/dev/null chars=ascii_letters,digits length=16') }}
+          ADMIN_EMAIL=admin@{{ ansible_fqdn }}
+          INSTALL_HARDENING=yes
+          INSTALL_MONITORING=no
+        mode: '0644'
+
+    - name: Run OTOBO installer
+      shell: |
+        cd {{ otobo_project_dir }} && bash install.sh --unattended
+      args:
+        creates: /opt/otobo/Kernel/Config.pm
+      register: install_result
+      failed_when: install_result.rc != 0
+
+    - name: Run verification
+      shell: |
+        cd {{ otobo_project_dir }} && bash verify.sh
+      register: verify_result
+      failed_when: verify_result.rc != 0

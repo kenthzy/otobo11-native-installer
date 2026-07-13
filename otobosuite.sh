@@ -17,7 +17,8 @@ show_menu() {
 	echo "  5) Upgrade OTOBO"
 	echo "  6) SSL Setup"
 	echo "  7) Backup"
-	echo "  8) Exit"
+	echo "  8) Security"
+	echo "  9) Exit"
 	echo "========================================"
 }
 
@@ -69,12 +70,8 @@ handle_backup_menu() {
 		schedule=$(prompt_with_default "Schedule" "0 2 * * *")
 		schedule_cron_backup "$schedule" "$SCRIPT_DIR/backup.sh"
 		;;
-	6)
-		return
-		;;
-	*)
-		warn "Invalid option"
-		;;
+	6) return ;;
+	*) warn "Invalid option" ;;
 	esac
 }
 
@@ -100,13 +97,7 @@ handle_ssl_menu() {
 	1)
 		local fqdn
 		fqdn=$(prompt_with_default "FQDN" "${FQDN:-$(hostname -f)}")
-		setup_self_signed_ssl "$fqdn"
-		local web_server="${WEB_SERVER:-apache}"
-		if [ "$web_server" = "nginx" ]; then
-			configure_nginx_site "$fqdn" "${OTOBO_ROOT:-/opt/otobo}" "${STARMAN_PORT:-5000}" "self-signed"
-		else
-			configure_apache_site "$fqdn" "${OTOBO_ROOT:-/opt/otobo}" "self-signed"
-		fi
+		setup_self_signed "$fqdn"
 		;;
 	2)
 		local fqdn email
@@ -114,12 +105,41 @@ handle_ssl_menu() {
 		email=$(prompt_with_default "Email" "admin@${fqdn}")
 		configure_ssl "${WEB_SERVER:-apache}" "$fqdn" "$email" "letsencrypt"
 		;;
-	3)
-		return
-		;;
-	*)
-		warn "Invalid option"
-		;;
+	3) return ;;
+	*) warn "Invalid option" ;;
+	esac
+}
+
+handle_security_menu() {
+	# shellcheck source=lib/config.sh
+	source "$SCRIPT_DIR/lib/config.sh"
+	# shellcheck source=lib/firewall.sh
+	source "$SCRIPT_DIR/lib/firewall.sh"
+	# shellcheck source=lib/security.sh
+	source "$SCRIPT_DIR/lib/pkg.sh"
+	source "$SCRIPT_DIR/lib/security.sh"
+	load_config
+
+	echo ""
+	echo "========================================"
+	echo "  Security Menu"
+	echo "========================================"
+	echo "  1) Configure firewall (UFW)"
+	echo "  2) Configure fail2ban"
+	echo "  3) Configure auto security updates"
+	echo "  4) Apply all hardening"
+	echo "  5) Back to main menu"
+	echo "========================================"
+
+	local choice
+	read -r -p "Select option: " choice
+	case "$choice" in
+	1) configure_ufw_rate_limit ;;
+	2) configure_fail2ban ;;
+	3) configure_unattended_upgrades ;;
+	4) run_security_hardening ;;
+	5) return ;;
+	*) warn "Invalid option" ;;
 	esac
 }
 
@@ -129,34 +149,19 @@ while true; do
 	choice=""
 	read -r -p "Select option: " choice
 	case "$choice" in
-	1)
-		bash "$SCRIPT_DIR/install.sh"
-		;;
-	2)
-		bash "$SCRIPT_DIR/repair.sh"
-		;;
-	3)
-		bash "$SCRIPT_DIR/verify.sh"
-		;;
-	4)
-		bash "$SCRIPT_DIR/uninstall.sh"
-		;;
-	5)
-		bash "$SCRIPT_DIR/upgrade.sh"
-		;;
-	6)
-		handle_ssl_menu
-		;;
-	7)
-		handle_backup_menu
-		;;
-	8)
+	1) bash "$SCRIPT_DIR/install.sh" ;;
+	2) bash "$SCRIPT_DIR/repair.sh" ;;
+	3) bash "$SCRIPT_DIR/verify.sh" ;;
+	4) bash "$SCRIPT_DIR/uninstall.sh" ;;
+	5) bash "$SCRIPT_DIR/upgrade.sh" ;;
+	6) handle_ssl_menu ;;
+	7) handle_backup_menu ;;
+	8) handle_security_menu ;;
+	9)
 		echo "Goodbye!"
 		exit 0
 		;;
-	*)
-		warn "Invalid option. Please select 1-8."
-		;;
+	*) warn "Invalid option. Please select 1-9." ;;
 	esac
 	echo ""
 	read -r -p "Press Enter to continue..."

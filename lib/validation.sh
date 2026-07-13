@@ -53,7 +53,7 @@ check_os() {
 
 	source /etc/os-release
 
-	if [[ "$ID" != "ubuntu" ]]; then
+	if ! os_is_supported; then
 		register_result "OS" "FAIL" "Unsupported OS: $PRETTY_NAME"
 		error "Unsupported operating system: $PRETTY_NAME"
 	fi

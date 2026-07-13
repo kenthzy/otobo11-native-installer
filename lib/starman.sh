@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 
-#############################################
-# OTOBOSuite - OTOBO Management Suite
-# Starman PSGI Server Module
-#############################################
-
 install_starman() {
 	info "Installing Starman PSGI server..."
-
-	apt-get install -y starman
+	pkg_install starman
 
 	if ! command -v starman >/dev/null 2>&1; then
 		cpanm -n Starman 2>/dev/null || true
@@ -22,7 +16,6 @@ install_starman() {
 	success "Starman installed."
 
 	info "Creating Starman systemd service..."
-
 	mkdir -p /run/otobo /opt/otobo/var/log
 
 	cat >/etc/systemd/system/otobo-starman.service <<-UNIT

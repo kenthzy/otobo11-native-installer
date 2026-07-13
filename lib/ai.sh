@@ -11,7 +11,7 @@ OTAI_LOG_DIR="/var/log/open-ticket-ai"
 setup_python_env() {
 	info "Setting up Python environment..."
 	if ! command -v python3 &>/dev/null; then
-		DEBCONF_FRONTEND=noninteractive apt-get install -y python3 python3-pip python3-venv || die "Failed to install Python 3"
+		pkg_install python3 python3-pip python3-venv
 	fi
 	if ! command -v uv &>/dev/null; then
 		info "Installing uv (fast Python package manager)..."

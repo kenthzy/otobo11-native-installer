@@ -2,7 +2,7 @@
 
 install_mariadb() {
 	info "Installing MariaDB server..."
-	DEBCONF_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client || die "Failed to install MariaDB"
+	pkg_install mariadb-server mariadb-client
 	systemctl enable mariadb
 	systemctl start mariadb
 	register_result "MariaDB Install" "OK" "MariaDB installed successfully"

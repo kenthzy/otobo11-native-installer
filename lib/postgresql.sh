@@ -1,48 +1,57 @@
 #!/usr/bin/env bash
 
-#############################################
-# OTOBOSuite - OTOBO Management Suite
-# PostgreSQL Installation Module
-#############################################
-
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-
 install_postgresql() {
-	local db_root_password
-	local creds_file="/root/.otobo_db_credentials"
-
-	source "$SCRIPT_DIR/lib/mariadb.sh"
-	source "$SCRIPT_DIR/lib/config.sh"
-	load_config
-
-	prompt_db_credentials
-
 	info "Installing PostgreSQL server..."
-
-	apt-get install -y postgresql postgresql-client
-
-	success "PostgreSQL packages installed."
-
-	info "Starting and enabling PostgreSQL..."
-
+	pkg_install postgresql postgresql-client
 	systemctl enable postgresql
-	systemctl restart postgresql
+	systemctl start postgresql
+	register_result "PostgreSQL Install" "OK" "PostgreSQL installed successfully"
+}
 
-	sleep 2
+configure_postgresql_db() {
+	local db_name="$1"
+	local db_user="$2"
+	local db_pass="$3"
+	info "Creating PostgreSQL database $db_name and user $db_user..."
+	sudo -u postgres psql -c "CREATE DATABASE ${db_name} ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8' TEMPLATE template0;" 2>/dev/null || true
+	sudo -u postgres psql -c "CREATE USER ${db_user} WITH PASSWORD '${db_pass}';" 2>/dev/null || true
+	sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${db_name} TO ${db_user};" 2>/dev/null || true
+	sudo -u postgres psql -c "ALTER DATABASE ${db_name} OWNER TO ${db_user};" 2>/dev/null || true
+	register_result "PostgreSQL DB Setup" "OK" "Database $db_name and user $db_user created"
+}
 
-	success "PostgreSQL is running."
+configure_postgresql_dsn() {
+	local db_host="$1"
+	local db_port="$2"
+	local db_name="$3"
+	local db_user="$4"
+	local db_pass="$5"
+	cat >/opt/otobo/Kernel/Config.pm <<EOF
+package Kernel::Config;
+use strict;
+use warnings;
+use utf8;
+sub Load {
+    my \$Self = shift;
+    \$Self->{DatabaseHost}   = '${db_host}';
+    \$Self->{DatabasePort}   = '${db_port}';
+    \$Self->{Database}       = '${db_name}';
+    \$Self->{DatabaseUser}   = '${db_user}';
+    \$Self->{DatabasePw}     = '${db_pass}';
+    \$Self->{DatabaseDSN}    = "DBI:Pg:database=${db_name};host=${db_host};port=${db_port}";
+    \$Self->{DatabaseType}   = 'postgresql';
+}
+1;
+EOF
+	chown otobo:www-data /opt/otobo/Kernel/Config.pm
+	chmod 640 /opt/otobo/Kernel/Config.pm
+	register_result "PostgreSQL DSN" "OK" "DSN configured for $db_name on $db_host:$db_port"
+}
 
-	info "Configuring PostgreSQL for OTOBO..."
-
+optimize_postgresql() {
 	local pg_version
 	pg_version=$(psql --version 2>/dev/null | grep -oP '\d+' | head -1)
-
-	if [[ -z "$pg_version" ]]; then
-		pg_version=$(find /etc/postgresql/ -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | head -1)
-		pg_version="${pg_version##*/}"
-	fi
-
-	if [[ -n "$pg_version" && -f "/etc/postgresql/${pg_version}/main/postgresql.conf" ]]; then
+	if [[ -f "/etc/postgresql/${pg_version}/main/postgresql.conf" ]]; then
 		cat >>"/etc/postgresql/${pg_version}/main/postgresql.conf" <<-EOF
 
 			# OTOBOSuite OTOBO-optimized settings
@@ -52,33 +61,6 @@ install_postgresql() {
 			maintenance_work_mem = 64MB
 			effective_cache_size = 512MB
 		EOF
-
 		systemctl restart postgresql
-		success "PostgreSQL configuration applied."
-	else
-		warning "Could not find PostgreSQL config directory. Skipping optimization."
 	fi
-
-	info "Generating root password and writing credentials..."
-
-	db_root_password=$(openssl rand -base64 32 | head -c32 && echo)
-
-	cat >"$creds_file" <<-EOF
-		# OTOBO Database Credentials
-		# Generated: $(date '+%Y-%m-%d %H:%M:%S')
-		# Store this file securely: chmod 600
-		DB_ENGINE=postgresql
-		DB_ROOT_PASSWORD=${db_root_password}
-		OTOBO_DB_HOST=localhost
-		OTOBO_DB_PORT=5432
-		OTOBO_DB_NAME=${OTOBO_DB_NAME}
-		OTOBO_DB_USER=${OTOBO_DB_USER}
-		OTOBO_DB_PASSWORD=${OTOBO_DB_PASSWORD}
-	EOF
-
-	chmod 600 "$creds_file"
-
-	success "Database credentials stored in ${creds_file}"
-
-	register_result "PostgreSQLInstall" "PASS" "PostgreSQL ${pg_version}+, configured for OTOBO"
 }

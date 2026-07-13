@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 
-#############################################
-# OTOBOSuite - OTOBO Management Suite
-# nginx Reverse Proxy Module
-#############################################
-
 install_nginx() {
 	info "Installing nginx..."
-
-	apt-get install -y nginx
+	pkg_install nginx
 
 	success "nginx installed."
 

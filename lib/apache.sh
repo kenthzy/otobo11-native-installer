@@ -2,7 +2,7 @@
 
 install_apache() {
 	info "Installing Apache with mod_perl..."
-	DEBCONF_FRONTEND=noninteractive apt-get install -y apache2 libapache2-mod-perl2 || die "Failed to install Apache"
+	pkg_install apache2 libapache2-mod-perl2
 	a2enmod perl
 	a2enmod rewrite
 	a2enmod headers
