@@ -45,7 +45,15 @@ source lib/apache.sh
 install_apache
 
 source lib/mariadb.sh
-install_mariadb
+prompt_db_engine
+echo
+
+if [[ "$DB_ENGINE" == "postgresql" ]]; then
+    source lib/postgresql.sh
+    install_postgresql
+else
+    install_mariadb
+fi
 
 source lib/perl.sh
 install_perl

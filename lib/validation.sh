@@ -132,20 +132,27 @@ check_apache() {
 }
 
 check_mariadb() {
-    info "Checking MariaDB..."
+    info "Checking database..."
 
-    if ! command -v mariadb >/dev/null 2>&1 && ! command -v mysql >/dev/null 2>&1; then
-        register_result "MariaDB" "INFO" "Not installed (will be installed)"
-        warning "MariaDB is not installed."
-        return
-    fi
-
-    if systemctl is-active --quiet mariadb; then
-        register_result "MariaDB" "PASS" "Running"
-        success "MariaDB is installed and running."
+    if command -v mariadb >/dev/null 2>&1 || command -v mysql >/dev/null 2>&1; then
+        if systemctl is-active --quiet mariadb 2>/dev/null; then
+            register_result "MariaDB" "PASS" "MariaDB installed and running"
+            success "MariaDB is installed and running."
+        else
+            register_result "MariaDB" "INFO" "MariaDB installed (not running — will be configured)"
+            info "MariaDB is installed but not running (will be configured later)."
+        fi
+    elif command -v psql >/dev/null 2>&1; then
+        if systemctl is-active --quiet postgresql 2>/dev/null; then
+            register_result "PostgreSQL" "PASS" "PostgreSQL installed and running"
+            success "PostgreSQL is installed and running."
+        else
+            register_result "PostgreSQL" "INFO" "PostgreSQL installed (not running — will be configured)"
+            info "PostgreSQL is installed but not running (will be configured later)."
+        fi
     else
-        register_result "MariaDB" "WARN" "Installed but not running"
-        warning "MariaDB is installed but not running."
+        register_result "Database" "INFO" "Not installed (will be installed)"
+        info "No database engine installed. Will install during setup."
     fi
 }
 

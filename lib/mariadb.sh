@@ -7,6 +7,36 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
+prompt_db_engine() {
+    source "$SCRIPT_DIR/lib/config.sh"
+    load_config
+
+    local cfg_engine
+    cfg_engine=$(config_value "DB_ENGINE" "")
+
+    if [[ -n "$cfg_engine" ]]; then
+        DB_ENGINE="$cfg_engine"
+        info "Using DB engine from config file: $DB_ENGINE"
+        return
+    fi
+
+    echo
+    echo -e "${BOLD}Database Engine Selection${NC}"
+    echo -e "${BOLD}-------------------------${NC}"
+    echo
+    echo " Choose your database engine:"
+    echo "   1) MariaDB  (default) — Recommended for OTOBO"
+    echo "   2) PostgreSQL         — Experimental support"
+    echo
+    read -rp " Enter your choice [1/2] (default: 1): " engine_choice
+
+    if [[ "$engine_choice" == "2" ]]; then
+        DB_ENGINE="postgresql"
+    else
+        DB_ENGINE="mariadb"
+    fi
+}
+
 prompt_db_credentials() {
     local creds_file="/root/.otobo_db_credentials"
 
@@ -133,6 +163,7 @@ install_mariadb() {
 		# Generated: $(date '+%Y-%m-%d %H:%M:%S')
 		# Store this file securely: chmod 600
 		# Root uses unix_socket auth — this password is stored for reference.
+		DB_ENGINE=mariadb
 		DB_ROOT_PASSWORD=${db_root_password}
 		OTOBO_DB_HOST=localhost
 		OTOBO_DB_PORT=3306

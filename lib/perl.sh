@@ -8,6 +8,11 @@
 install_perl() {
     info "Installing Perl dependencies..."
 
+    local db_driver="libdbd-mysql-perl"
+    if [[ "${DB_ENGINE:-mariadb}" == "postgresql" ]]; then
+        db_driver="libdbd-pg-perl"
+    fi
+
     apt-get install -y \
         build-essential \
         cpanminus \
@@ -19,7 +24,7 @@ install_perl() {
         libconvert-binhex-perl \
         libcrypt-eksblowfish-perl \
         libdatetime-perl \
-        libdbd-mysql-perl \
+        "$db_driver" \
         libdbi-perl \
         libdbix-connector-perl \
         libencode-hanextra-perl \

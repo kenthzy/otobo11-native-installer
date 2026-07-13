@@ -149,17 +149,30 @@ backup_database() {
     local db_pass="${OTOBO_DB_PASSWORD:-}"
     local db_user="${OTOBO_DB_USER:-otobo}"
     local db_name="${OTOBO_DB_NAME:-otobo}"
+    local engine="${DB_ENGINE:-mariadb}"
 
-    if ! command -v mysqldump >/dev/null 2>&1; then
-        register_result "Database" "SKIP" "mysqldump not available"
-        warning "MySQL client not installed. Skipping database backup."
-        return 1
-    fi
-
-    if [[ -n "$db_pass" ]]; then
-        mysqldump -u "$db_user" -p"$db_pass" "$db_name" >"$BACKUP_DEST/otobo-db.sql" 2>/dev/null
+    if [[ "$engine" == "postgresql" ]]; then
+        if ! command -v pg_dump >/dev/null 2>&1; then
+            register_result "Database" "SKIP" "pg_dump not available"
+            warning "PostgreSQL client not installed. Skipping database backup."
+            return 1
+        fi
+        if [[ -n "$db_pass" ]]; then
+            PGPASSWORD="$db_pass" pg_dump -U "$db_user" -h localhost "$db_name" >"$BACKUP_DEST/otobo-db.sql" 2>/dev/null
+        else
+            pg_dump "$db_name" >"$BACKUP_DEST/otobo-db.sql" 2>/dev/null
+        fi
     else
-        mysqldump "$db_name" >"$BACKUP_DEST/otobo-db.sql" 2>/dev/null
+        if ! command -v mysqldump >/dev/null 2>&1; then
+            register_result "Database" "SKIP" "mysqldump not available"
+            warning "MySQL client not installed. Skipping database backup."
+            return 1
+        fi
+        if [[ -n "$db_pass" ]]; then
+            mysqldump -u "$db_user" -p"$db_pass" "$db_name" >"$BACKUP_DEST/otobo-db.sql" 2>/dev/null
+        else
+            mysqldump "$db_name" >"$BACKUP_DEST/otobo-db.sql" 2>/dev/null
+        fi
     fi
 
     if [[ -f "$BACKUP_DEST/otobo-db.sql" ]]; then

@@ -58,7 +58,24 @@ verify_apache() {
     fi
 }
 
+detect_db_engine() {
+    if [[ -f /root/.otobo_db_credentials ]]; then
+        source /root/.otobo_db_credentials
+        echo "${DB_ENGINE:-mariadb}"
+    else
+        echo "mariadb"
+    fi
+}
+
 verify_mariadb() {
+    local engine
+    engine=$(detect_db_engine)
+
+    if [[ "$engine" == "postgresql" ]]; then
+        verify_postgresql
+        return
+    fi
+
     info "Verifying MariaDB..."
 
     if ! command -v mariadb >/dev/null 2>&1 && ! command -v mysql >/dev/null 2>&1; then
@@ -89,6 +106,40 @@ verify_mariadb() {
     else
         register_result "MariaDB" "PASS" "Running, DB 'otobo' and user exist"
         success "MariaDB verified."
+    fi
+}
+
+verify_postgresql() {
+    info "Verifying PostgreSQL..."
+
+    if ! command -v psql >/dev/null 2>&1; then
+        register_result "PostgreSQL" "FAIL" "PostgreSQL is not installed"
+        warning "PostgreSQL is not installed."
+        return
+    fi
+
+    if ! systemctl is-active --quiet postgresql 2>/dev/null; then
+        register_result "PostgreSQL" "FAIL" "PostgreSQL is not running"
+        warning "PostgreSQL is not running."
+        return
+    fi
+
+    local issues=""
+
+    if ! su - postgres -c "psql -lqt 2>/dev/null" | cut -d \| -f 1 | grep -qw "otobo"; then
+        issues="${issues}database 'otobo' missing; "
+    fi
+
+    if ! su - postgres -c "psql -t -c \"SELECT 1 FROM pg_roles WHERE rolname='otobo'\"" 2>/dev/null | grep -q 1; then
+        issues="${issues}user 'otobo' missing; "
+    fi
+
+    if [[ -n "$issues" ]]; then
+        register_result "PostgreSQL" "WARN" "Running but: ${issues%%; }"
+        warning "PostgreSQL issues: ${issues%%; }"
+    else
+        register_result "PostgreSQL" "PASS" "Running, DB 'otobo' and user exist"
+        success "PostgreSQL verified."
     fi
 }
 
@@ -166,6 +217,7 @@ verify_database() {
     local db_host
     local db_user
     local db_pw
+    local dsn
 
     # shellcheck disable=SC2016
     db_host=$(perl -ne 'print $1 if /\$Self->\{DatabaseHost\}\s*=\s*'\''([^'\'']+)/' "$CONFIG_FILE")
@@ -173,6 +225,8 @@ verify_database() {
     db_user=$(perl -ne 'print $1 if /\$Self->\{DatabaseUser\}\s*=\s*'\''([^'\'']+)/' "$CONFIG_FILE")
     # shellcheck disable=SC2016
     db_pw=$(perl -ne 'print $1 if /\$Self->\{DatabasePw\}\s*=\s*'\''([^'\'']+)/' "$CONFIG_FILE")
+    # shellcheck disable=SC2016
+    dsn=$(perl -ne 'print $1 if /\$Self->\{DatabaseDSN\}\s*=\s*'\''([^'\'']+)/' "$CONFIG_FILE")
 
     db_host="${db_host:-localhost}"
     db_user="${db_user:-otobo}"
@@ -183,12 +237,22 @@ verify_database() {
         return
     fi
 
-    if mysql -u "$db_user" -p"$db_pw" -h "$db_host" -e "SELECT 1" >/dev/null 2>&1; then
-        register_result "Database" "PASS" "Connection successful"
-        success "Database connection verified."
+    if echo "$dsn" | grep -q "^DBI:Pg:"; then
+        if PGPASSWORD="$db_pw" psql -h "$db_host" -U "$db_user" -d otobo -c "SELECT 1" >/dev/null 2>&1; then
+            register_result "Database" "PASS" "Connection successful (PostgreSQL)"
+            success "Database connection verified."
+        else
+            register_result "Database" "FAIL" "Cannot connect using Config.pm credentials"
+            warning "Database connection failed."
+        fi
     else
-        register_result "Database" "FAIL" "Cannot connect using Config.pm credentials"
-        warning "Database connection failed."
+        if mysql -u "$db_user" -p"$db_pw" -h "$db_host" -e "SELECT 1" >/dev/null 2>&1; then
+            register_result "Database" "PASS" "Connection successful"
+            success "Database connection verified."
+        else
+            register_result "Database" "FAIL" "Cannot connect using Config.pm credentials"
+            warning "Database connection failed."
+        fi
     fi
 }
 

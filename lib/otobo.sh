@@ -133,6 +133,17 @@ setup_database() {
     # shellcheck disable=SC1090,SC2153
     source "$creds_file"
 
+    if [[ "${DB_ENGINE:-mariadb}" == "postgresql" ]]; then
+        setup_database_pg
+    else
+        setup_database_mysql
+    fi
+
+    register_result "OTOBO_Database" "PASS" "Database '${OTOBO_DB_NAME}' and user created"
+    success "OTOBO database and user created."
+}
+
+setup_database_mysql() {
     mysql <<-EOF
 		CREATE DATABASE IF NOT EXISTS ${OTOBO_DB_NAME}
 		    CHARACTER SET utf8mb4
@@ -146,9 +157,19 @@ setup_database() {
 
 		FLUSH PRIVILEGES;
 	EOF
+}
 
-    register_result "OTOBO_Database" "PASS" "Database 'otobo' and user created"
-    success "OTOBO database and user created."
+setup_database_pg() {
+    local pg_exists
+
+    pg_exists=$(su - postgres -c "psql -t -c \"SELECT 1 FROM pg_roles WHERE rolname='${OTOBO_DB_USER}'\"" 2>/dev/null | tr -d ' ')
+    if [[ "$pg_exists" != "1" ]]; then
+        su - postgres -c "psql -c \"CREATE USER ${OTOBO_DB_USER} WITH PASSWORD '${OTOBO_DB_PASSWORD}'\"" 2>/dev/null
+    fi
+
+    su - postgres -c "psql -c \"CREATE DATABASE ${OTOBO_DB_NAME} OWNER ${OTOBO_DB_USER} ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8'\"" 2>/dev/null || true
+
+    su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE ${OTOBO_DB_NAME} TO ${OTOBO_DB_USER}\"" 2>/dev/null
 }
 
 write_config() {
@@ -174,6 +195,13 @@ write_config() {
     # shellcheck disable=SC1090
     source "$creds_file"
 
+    local dsn
+    if [[ "${DB_ENGINE:-mariadb}" == "postgresql" ]]; then
+        dsn="DBI:Pg:database=${OTOBO_DB_NAME};host=${OTOBO_DB_HOST};"
+    else
+        dsn="DBI:mysql:database=${OTOBO_DB_NAME};host=${OTOBO_DB_HOST};"
+    fi
+
     cat >"$config_file" <<-EOF
 		package Kernel::Config::Files::AAInstaller;
 		use strict;
@@ -187,7 +215,7 @@ write_config() {
 		    \$Self->{Database}     = '${OTOBO_DB_NAME}';
 		    \$Self->{DatabaseUser} = '${OTOBO_DB_USER}';
 		    \$Self->{DatabasePw}   = '${OTOBO_DB_PASSWORD}';
-		    \$Self->{DatabaseDSN}  = 'DBI:mysql:database=${OTOBO_DB_NAME};host=${OTOBO_DB_HOST};';
+		    \$Self->{DatabaseDSN}  = '${dsn}';
 
 		    return 1;
 		}

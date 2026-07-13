@@ -125,9 +125,22 @@ check_prerequisites() {
         apt-get install -y curl
     fi
 
-    if ! mysql --version >/dev/null 2>&1; then
-        register_result "Prerequisites" "FAIL" "MySQL client not found"
-        error "MySQL client is required for database backup."
+    local engine="mariadb"
+    if [[ -f "$CREDS_FILE" ]]; then
+        source "$CREDS_FILE"
+        engine="${DB_ENGINE:-mariadb}"
+    fi
+
+    if [[ "$engine" == "postgresql" ]]; then
+        if ! command -v pg_dump >/dev/null 2>&1; then
+            register_result "Prerequisites" "FAIL" "pg_dump not found"
+            error "pg_dump is required for PostgreSQL backup."
+        fi
+    else
+        if ! mysql --version >/dev/null 2>&1; then
+            register_result "Prerequisites" "FAIL" "MySQL client not found"
+            error "MySQL client is required for database backup."
+        fi
     fi
 
     register_result "Prerequisites" "PASS" "All prerequisites met"
@@ -161,6 +174,7 @@ backup_database() {
     local db_name="otobo"
     local db_user="otobo"
     local db_pass=""
+    local engine="mariadb"
 
     if [[ -f "$CREDS_FILE" ]]; then
         # shellcheck disable=SC1090
@@ -168,14 +182,23 @@ backup_database() {
         db_name="${OTOBO_DB_NAME:-otobo}"
         db_user="${OTOBO_DB_USER:-otobo}"
         db_pass="${OTOBO_DB_PASSWORD:-}"
+        engine="${DB_ENGINE:-mariadb}"
     fi
 
     mkdir -p "$BACKUP_DIR/$TIMESTAMP"
 
-    if [[ -n "$db_pass" ]]; then
-        mysqldump -u "$db_user" -p"$db_pass" "$db_name" >"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null
+    if [[ "$engine" == "postgresql" ]]; then
+        if [[ -n "$db_pass" ]]; then
+            PGPASSWORD="$db_pass" pg_dump -U "$db_user" -h localhost "$db_name" >"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null
+        else
+            pg_dump "$db_name" >"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null
+        fi
     else
-        mysqldump "$db_name" >"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null
+        if [[ -n "$db_pass" ]]; then
+            mysqldump -u "$db_user" -p"$db_pass" "$db_name" >"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null
+        else
+            mysqldump "$db_name" >"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null
+        fi
     fi
 
     if [[ -f "$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" ]]; then
@@ -361,14 +384,22 @@ rollback() {
 
     if [[ -f "$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" ]]; then
         local db_name="otobo"
+        local engine="mariadb"
 
         if [[ -f "$CREDS_FILE" ]]; then
             # shellcheck disable=SC1090
             source "$CREDS_FILE"
             db_name="${OTOBO_DB_NAME:-otobo}"
+            engine="${DB_ENGINE:-mariadb}"
         fi
 
-        mysql "$db_name" <"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null || true
+        if [[ "$engine" == "postgresql" ]]; then
+            su - postgres -c "psql -c \"DROP DATABASE IF EXISTS ${db_name}\"" 2>/dev/null || true
+            su - postgres -c "psql -c \"CREATE DATABASE ${db_name} OWNER ${OTOBO_DB_USER:-otobo}\"" 2>/dev/null || true
+            PGPASSWORD="${OTOBO_DB_PASSWORD:-}" psql -h localhost -U "${OTOBO_DB_USER:-otobo}" -d "$db_name" <"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null || true
+        else
+            mysql "$db_name" <"$BACKUP_DIR/$TIMESTAMP/otobo-db.sql" 2>/dev/null || true
+        fi
         info "Database restored from backup."
     fi
 

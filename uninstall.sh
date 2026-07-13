@@ -187,8 +187,13 @@ remove_database() {
     if [[ -f "$creds_file" ]]; then
         # shellcheck disable=SC1090
         source "$creds_file"
-        mysql -e "DROP DATABASE IF EXISTS ${OTOBO_DB_NAME};" 2>/dev/null || true
-        mysql -e "DROP USER IF EXISTS '${OTOBO_DB_USER}'@'${OTOBO_DB_HOST}';" 2>/dev/null || true
+        if [[ "${DB_ENGINE:-mariadb}" == "postgresql" ]]; then
+            su - postgres -c "psql -c \"DROP DATABASE IF EXISTS ${OTOBO_DB_NAME}\"" 2>/dev/null || true
+            su - postgres -c "psql -c \"DROP ROLE IF EXISTS ${OTOBO_DB_USER}\"" 2>/dev/null || true
+        else
+            mysql -e "DROP DATABASE IF EXISTS ${OTOBO_DB_NAME};" 2>/dev/null || true
+            mysql -e "DROP USER IF EXISTS '${OTOBO_DB_USER}'@'${OTOBO_DB_HOST}';" 2>/dev/null || true
+        fi
         register_result "Database" "PASS" "Database '${OTOBO_DB_NAME}' and user removed"
         success "OTOBO database and user removed."
     else
@@ -199,15 +204,18 @@ remove_database() {
     fi
 }
 
-remove_mariadb_config() {
+remove_db_config() {
     if [[ -f /etc/mysql/mariadb.conf.d/99-otobo.cnf ]]; then
         rm -f /etc/mysql/mariadb.conf.d/99-otobo.cnf
-        systemctl restart mariadb
-        register_result "MariaCnf" "PASS" "MariaDB OTOBO config removed"
+        systemctl restart mariadb 2>/dev/null || true
+        register_result "DBConfig" "PASS" "MariaDB OTOBO config removed"
         success "MariaDB OTOBO config removed."
+    elif grep -q "otobo" /etc/postgresql/*/main/postgresql.conf 2>/dev/null; then
+        register_result "DBConfig" "INFO" "PostgreSQL OTOBO config present (manual cleanup may be needed)"
+        info "PostgreSQL config changes were applied directly. Manual cleanup may be needed."
     else
-        register_result "MariaCnf" "INFO" "No MariaDB OTOBO config found"
-        info "MariaDB OTOBO config not found. Skipping."
+        register_result "DBConfig" "INFO" "No DB OTOBO config found"
+        info "No database OTOBO configuration found. Skipping."
     fi
 }
 
@@ -293,7 +301,7 @@ main() {
         restore_apache_modules
         remove_systemd_services
         remove_database
-        remove_mariadb_config
+        remove_db_config
         remove_credentials
         remove_firewall_rules
         restart_apache
@@ -304,7 +312,7 @@ main() {
         uninstall_step "ApacheMods" "Apache OTOBO modules" restore_apache_modules
         uninstall_step "Systemd" "systemd services" remove_systemd_services
         uninstall_step "Database" "MariaDB database + user" remove_database
-        uninstall_step "MariaCnf" "MariaDB OTOBO config" remove_mariadb_config
+        uninstall_step "DBConfig" "DB OTOBO config" remove_db_config
         uninstall_step "Credentials" "credentials file" remove_credentials
         uninstall_step "Firewall" "firewall rules" remove_firewall_rules
         uninstall_step "ApacheRestart" "Apache restart" restart_apache

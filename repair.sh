@@ -99,7 +99,25 @@ diagnose_apache() {
     fi
 }
 
+detect_db_engine() {
+    if [[ -f "$CREDS_FILE" ]]; then
+        # shellcheck disable=SC1090
+        source "$CREDS_FILE"
+        echo "${DB_ENGINE:-mariadb}"
+    else
+        echo "mariadb"
+    fi
+}
+
 diagnose_mariadb() {
+    local engine
+    engine=$(detect_db_engine)
+
+    if [[ "$engine" == "postgresql" ]]; then
+        diagnose_postgresql
+        return
+    fi
+
     info "Checking MariaDB..."
 
     if ! command -v mariadb >/dev/null 2>&1 && ! command -v mysql >/dev/null 2>&1; then
@@ -120,6 +138,30 @@ diagnose_mariadb() {
     else
         register_diagnosis "MariaDB" "PASS" "Running and OTOBO database exists"
         success "MariaDB is healthy."
+    fi
+}
+
+diagnose_postgresql() {
+    info "Checking PostgreSQL..."
+
+    if ! command -v psql >/dev/null 2>&1; then
+        register_diagnosis "PostgreSQL" "FAIL" "PostgreSQL is not installed"
+        warning "PostgreSQL is not installed."
+        return
+    fi
+
+    if ! systemctl is-active --quiet postgresql 2>/dev/null; then
+        register_diagnosis "PostgreSQL" "FAIL" "PostgreSQL is not running"
+        warning "PostgreSQL is not running."
+        return
+    fi
+
+    if su - postgres -c "psql -lqt 2>/dev/null" | cut -d \| -f 1 | grep -qw "otobo"; then
+        register_diagnosis "PostgreSQL" "PASS" "Running and OTOBO database exists"
+        success "PostgreSQL is healthy."
+    else
+        register_diagnosis "PostgreSQL" "WARN" "OTBO database 'otobo' does not exist"
+        warning "OTBO database 'otobo' does not exist."
     fi
 }
 
@@ -319,6 +361,14 @@ repair_apache() {
 
 repair_mariadb() {
     local idx="$1"
+    local engine
+    engine=$(detect_db_engine)
+
+    if [[ "$engine" == "postgresql" ]]; then
+        repair_postgresql "$idx"
+        return
+    fi
+
     info "Repairing MariaDB..."
 
     if ! systemctl is-active --quiet mariadb 2>/dev/null; then
@@ -348,6 +398,30 @@ repair_mariadb() {
     fi
 
     success "MariaDB repaired."
+}
+
+repair_postgresql() {
+    local idx="$1"
+    info "Repairing PostgreSQL..."
+
+    if ! systemctl is-active --quiet postgresql 2>/dev/null; then
+        systemctl start postgresql || true
+    fi
+
+    if [[ -f "$CREDS_FILE" ]]; then
+        # shellcheck disable=SC1090
+        source "$CREDS_FILE"
+        local user_exists
+        user_exists=$(su - postgres -c "psql -t -c \"SELECT 1 FROM pg_roles WHERE rolname='${OTOBO_DB_USER}'\"" 2>/dev/null | tr -d ' ')
+        if [[ "$user_exists" != "1" ]]; then
+            su - postgres -c "psql -c \"CREATE USER ${OTOBO_DB_USER} WITH PASSWORD '${OTOBO_DB_PASSWORD}'\"" 2>/dev/null || true
+        fi
+        su - postgres -c "psql -c \"CREATE DATABASE ${OTOBO_DB_NAME} OWNER ${OTOBO_DB_USER} ENCODING 'UTF8'\"" 2>/dev/null || true
+        su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE ${OTOBO_DB_NAME} TO ${OTOBO_DB_USER}\"" 2>/dev/null || true
+        register_repair "$idx" "FIXED" "Database and user recreated"
+    fi
+
+    success "PostgreSQL repaired."
 }
 
 repair_perl_modules() {
@@ -393,6 +467,9 @@ repair_config() {
 
 repair_db_connection() {
     local idx="$1"
+    local engine
+    engine=$(detect_db_engine)
+
     info "Repairing database connection..."
 
     if [[ ! -f "$CREDS_FILE" ]]; then
@@ -404,6 +481,11 @@ repair_db_connection() {
     # shellcheck disable=SC1090
     source "$CREDS_FILE"
 
+    if [[ "$engine" == "postgresql" ]]; then
+        repair_db_connection_pg "$idx"
+        return
+    fi
+
     mysql <<-EOF
 		GRANT ALL PRIVILEGES ON ${OTOBO_DB_NAME}.*
 		    TO '${OTOBO_DB_USER}'@'${OTOBO_DB_HOST}';
@@ -411,6 +493,20 @@ repair_db_connection() {
 	EOF
 
     if mysql -u "${OTOBO_DB_USER}" -p"${OTOBO_DB_PASSWORD}" -h "${OTOBO_DB_HOST}" -e "SELECT 1" >/dev/null 2>&1; then
+        register_repair "$idx" "FIXED" "Database privileges re-granted, connection verified"
+        success "Database connection repaired."
+    else
+        register_repair "$idx" "FAIL" "Still unable to connect after re-grant"
+        warning "Database connection still failing after repair."
+    fi
+}
+
+repair_db_connection_pg() {
+    local idx="$1"
+
+    su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE ${OTOBO_DB_NAME} TO ${OTOBO_DB_USER}\"" 2>/dev/null || true
+
+    if PGPASSWORD="${OTOBO_DB_PASSWORD}" psql -h "${OTOBO_DB_HOST}" -U "${OTOBO_DB_USER}" -d "${OTOBO_DB_NAME}" -c "SELECT 1" >/dev/null 2>&1; then
         register_repair "$idx" "FIXED" "Database privileges re-granted, connection verified"
         success "Database connection repaired."
     else
