@@ -24,7 +24,25 @@ APACHE_SITE="zzz_otobo"
 # Verification Functions
 # -------------------------------------------------
 
+detect_webserver() {
+    if command -v nginx >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+        echo "nginx"
+    elif command -v apache2 >/dev/null 2>&1; then
+        echo "apache"
+    else
+        echo ""
+    fi
+}
+
 verify_apache() {
+    local ws
+    ws=$(detect_webserver)
+
+    if [[ "$ws" == "nginx" ]]; then
+        verify_nginx
+        return
+    fi
+
     info "Verifying Apache..."
 
     if ! command -v apache2 >/dev/null 2>&1; then
@@ -55,6 +73,48 @@ verify_apache() {
     else
         register_result "Apache" "PASS" "Running, OTOBO site enabled, config valid"
         success "Apache verified."
+    fi
+}
+
+verify_nginx() {
+    info "Verifying nginx..."
+
+    if ! command -v nginx >/dev/null 2>&1; then
+        register_result "Nginx" "FAIL" "nginx is not installed"
+        warning "nginx is not installed."
+        return
+    fi
+
+    if ! systemctl is-active --quiet nginx 2>/dev/null; then
+        register_result "Nginx" "FAIL" "nginx is not running"
+        warning "nginx is not running."
+        return
+    fi
+
+    local issues=""
+
+    if [[ ! -f /etc/nginx/sites-available/otobo ]]; then
+        issues="${issues}OTBO site config missing; "
+    fi
+
+    if ! nginx -t 2>/dev/null; then
+        issues="${issues}config syntax error; "
+    fi
+
+    if command -v starman >/dev/null 2>&1; then
+        if systemctl is-active --quiet otobo-starman 2>/dev/null; then
+            register_result "Starman" "PASS" "Starman is running"
+        else
+            issues="${issues}Starman not running; "
+        fi
+    fi
+
+    if [[ -n "$issues" ]]; then
+        register_result "Nginx" "WARN" "Running but issues: ${issues%%; }"
+        warning "nginx issues: ${issues%%; }"
+    else
+        register_result "Nginx" "PASS" "Running, OTOBO site configured, config valid"
+        success "nginx verified."
     fi
 }
 

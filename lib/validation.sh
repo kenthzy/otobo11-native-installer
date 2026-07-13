@@ -114,20 +114,27 @@ check_disk() {
 }
 
 check_apache() {
-    info "Checking Apache..."
+    info "Checking web server..."
 
-    if ! command -v apache2 >/dev/null 2>&1; then
-        register_result "Apache" "INFO" "Not installed (will be installed)"
-        warning "Apache is not installed."
-        return
-    fi
-
-    if systemctl is-active --quiet apache2; then
-        register_result "Apache" "PASS" "Running ($(apache2 -v 2>/dev/null | head -1))"
-        success "Apache is installed and running."
+    if command -v nginx >/dev/null 2>&1; then
+        if systemctl is-active --quiet nginx; then
+            register_result "Nginx" "PASS" "Running ($(nginx -v 2>&1 | head -1))"
+            success "nginx is installed and running."
+        else
+            register_result "Nginx" "WARN" "Installed but not running"
+            warning "nginx is installed but not running."
+        fi
+    elif command -v apache2 >/dev/null 2>&1; then
+        if systemctl is-active --quiet apache2; then
+            register_result "Apache" "PASS" "Running ($(apache2 -v 2>/dev/null | head -1))"
+            success "Apache is installed and running."
+        else
+            register_result "Apache" "WARN" "Installed but not running"
+            warning "Apache is installed but not running."
+        fi
     else
-        register_result "Apache" "WARN" "Installed but not running"
-        warning "Apache is installed but not running."
+        register_result "Apache" "INFO" "Not installed (will be installed)"
+        info "No web server installed. Will install during setup."
     fi
 }
 

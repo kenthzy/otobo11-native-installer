@@ -231,29 +231,50 @@ write_config() {
 }
 
 restart_services() {
-    info "Restarting Apache..."
+    local test_url="http://localhost/otobo/installer.pl"
 
-    if ! apache2ctl configtest 2>/dev/null; then
-        register_result "OTOBO_Services" "FAIL" "Apache config syntax invalid"
-        error "Apache configuration syntax error — refusing to restart"
-    fi
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        info "Restarting nginx and Starman..."
 
-    systemctl restart apache2
+        if ! nginx -t 2>/dev/null; then
+            register_result "OTOBO_Services" "FAIL" "nginx config syntax invalid"
+            error "nginx configuration syntax error — refusing to restart"
+        fi
 
-    sleep 3
+        systemctl restart nginx
+        systemctl restart otobo-starman 2>/dev/null || true
 
-    if ! systemctl is-active --quiet apache2; then
-        register_result "OTOBO_Services" "FAIL" "Apache failed to start"
-        error "Apache failed to start after restart"
-    fi
+        sleep 3
 
-    if curl -s -o /dev/null -w "%{http_code}" http://localhost/otobo/installer.pl |
-        grep -qE '200|302'; then
-        register_result "OTOBO_Services" "PASS" "Apache restarted and serving OTOBO"
-        success "Apache restarted and serving OTOBO."
+        if ! systemctl is-active --quiet nginx; then
+            register_result "OTOBO_Services" "FAIL" "nginx failed to start"
+            error "nginx failed to start"
+        fi
     else
-        register_result "OTOBO_Services" "WARN" "Apache restarted but /otobo/ not reachable"
-        warning "Apache restarted but /otobo/installer.pl is not responding."
+        info "Restarting Apache..."
+
+        if ! apache2ctl configtest 2>/dev/null; then
+            register_result "OTOBO_Services" "FAIL" "Apache config syntax invalid"
+            error "Apache configuration syntax error — refusing to restart"
+        fi
+
+        systemctl restart apache2
+
+        sleep 3
+
+        if ! systemctl is-active --quiet apache2; then
+            register_result "OTOBO_Services" "FAIL" "Apache failed to start"
+            error "Apache failed to start after restart"
+        fi
+    fi
+
+    if curl -s -o /dev/null -w "%{http_code}" "$test_url" |
+        grep -qE '200|302'; then
+        register_result "OTOBO_Services" "PASS" "Web server restarted and serving OTOBO"
+        success "Web server restarted and serving OTOBO."
+    else
+        register_result "OTOBO_Services" "WARN" "Web server restarted but /otobo/ not reachable"
+        warning "Web server restarted but /otobo/installer.pl is not responding."
         warning "Run 'sudo ./verify.sh' or 'sudo ./repair.sh --check' to diagnose."
     fi
 }
@@ -415,7 +436,13 @@ install_otobo() {
 
     download_otobo
     create_otobo_user
-    configure_apache
+
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        configure_nginx
+    else
+        configure_apache
+    fi
+
     configure_systemd
     set_permissions
     setup_database
@@ -424,4 +451,18 @@ install_otobo() {
     create_admin_user
 
     show_completion
+}
+
+configure_nginx() {
+    info "Configuring nginx for OTOBO..."
+
+    if [[ ! -f /opt/otobo/script/psgi-bin/otobo.psgi ]]; then
+        register_result "OTOBO_Nginx" "FAIL" "OTOBO PSGI script not found"
+        error "OTOBO PSGI script missing: /opt/otobo/script/psgi-bin/otobo.psgi"
+    fi
+
+    chown -R otobo:www-data /opt/otobo/script
+
+    register_result "OTOBO_Nginx" "PASS" "nginx reverse proxy configured"
+    success "nginx configuration for OTOBO completed."
 }

@@ -5,6 +5,38 @@
 # Apache Installation Module
 #############################################
 
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+prompt_web_server() {
+    source "$SCRIPT_DIR/lib/config.sh"
+    load_config
+
+    local cfg_ws
+    cfg_ws=$(config_value "WEB_SERVER" "")
+
+    if [[ -n "$cfg_ws" ]]; then
+        WEB_SERVER="$cfg_ws"
+        info "Using web server from config file: $WEB_SERVER"
+        return
+    fi
+
+    echo
+    echo -e "${BOLD}Web Server Selection${NC}"
+    echo -e "${BOLD}-------------------${NC}"
+    echo
+    echo " Choose your web server:"
+    echo "   1) Apache (default)     — mod_perl, mpm_prefork"
+    echo "   2) nginx + Starman      — Reverse proxy + PSGI"
+    echo
+    read -rp " Enter your choice [1/2] (default: 1): " ws_choice
+
+    if [[ "$ws_choice" == "2" ]]; then
+        WEB_SERVER="nginx"
+    else
+        WEB_SERVER="apache"
+    fi
+}
+
 install_apache() {
     info "Installing Apache and mod_perl..."
 

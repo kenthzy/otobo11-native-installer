@@ -250,14 +250,18 @@ remove_firewall_rules() {
     fi
 }
 
-restart_apache() {
-    if systemctl is-active --quiet apache2; then
+restart_webserver() {
+    if command -v nginx >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+        systemctl restart nginx
+        register_result "WebRestart" "PASS" "nginx restarted"
+        success "nginx restarted."
+    elif systemctl is-active --quiet apache2 2>/dev/null; then
         systemctl restart apache2
-        register_result "ApacheRestart" "PASS" "Apache restarted"
+        register_result "WebRestart" "PASS" "Apache restarted"
         success "Apache restarted."
     else
-        register_result "ApacheRestart" "INFO" "Apache not running, skipping restart"
-        info "Apache not running. Skipping restart."
+        register_result "WebRestart" "INFO" "Web server not running, skipping restart"
+        info "Web server not running. Skipping restart."
     fi
 }
 
@@ -304,18 +308,18 @@ main() {
         remove_db_config
         remove_credentials
         remove_firewall_rules
-        restart_apache
+        restart_webserver
     else
         uninstall_step "OTOBOfiles" "OTOBO files (/opt/otobo)" remove_otobo_files
         uninstall_step "OTOBouser" "system user 'otobo'" remove_otobo_user
         uninstall_step "ApacheSite" "Apache site (zzz_otobo)" remove_apache_config
         uninstall_step "ApacheMods" "Apache OTOBO modules" restore_apache_modules
         uninstall_step "Systemd" "systemd services" remove_systemd_services
-        uninstall_step "Database" "MariaDB database + user" remove_database
+        uninstall_step "Database" "database + user" remove_database
         uninstall_step "DBConfig" "DB OTOBO config" remove_db_config
         uninstall_step "Credentials" "credentials file" remove_credentials
         uninstall_step "Firewall" "firewall rules" remove_firewall_rules
-        uninstall_step "ApacheRestart" "Apache restart" restart_apache
+        uninstall_step "WebRestart" "Web server restart" restart_webserver
     fi
 
     uninstall_summary

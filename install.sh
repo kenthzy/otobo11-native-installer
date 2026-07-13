@@ -42,7 +42,17 @@ info "Updating package lists..."
 apt-get update
 
 source lib/apache.sh
-install_apache
+prompt_web_server
+echo
+
+if [[ "$WEB_SERVER" == "nginx" ]]; then
+    source lib/nginx.sh
+    install_nginx
+    source lib/starman.sh
+    install_starman
+else
+    install_apache
+fi
 
 source lib/mariadb.sh
 prompt_db_engine

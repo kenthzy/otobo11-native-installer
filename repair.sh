@@ -58,7 +58,25 @@ register_repair() {
 # Diagnostic Functions
 # -------------------------------------------------
 
+detect_webserver() {
+    if command -v nginx >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+        echo "nginx"
+    elif command -v apache2 >/dev/null 2>&1; then
+        echo "apache"
+    else
+        echo ""
+    fi
+}
+
 diagnose_apache() {
+    local ws
+    ws=$(detect_webserver)
+
+    if [[ "$ws" == "nginx" ]]; then
+        diagnose_nginx
+        return
+    fi
+
     info "Checking Apache..."
 
     if ! command -v apache2 >/dev/null 2>&1; then
@@ -96,6 +114,48 @@ diagnose_apache() {
     else
         register_diagnosis "Apache" "PASS" "Running, OTOBO site enabled, all modules loaded"
         success "Apache is healthy."
+    fi
+}
+
+diagnose_nginx() {
+    info "Checking nginx..."
+
+    if ! command -v nginx >/dev/null 2>&1; then
+        register_diagnosis "Nginx" "FAIL" "nginx is not installed"
+        warning "nginx is not installed."
+        return
+    fi
+
+    if ! systemctl is-active --quiet nginx 2>/dev/null; then
+        register_diagnosis "Nginx" "FAIL" "nginx is not running"
+        warning "nginx is not running."
+        return
+    fi
+
+    local issues=""
+
+    if [[ ! -f /etc/nginx/sites-available/otobo ]]; then
+        issues="${issues}OTBO site config missing; "
+    fi
+
+    if ! nginx -t 2>/dev/null; then
+        issues="${issues}config syntax error; "
+    fi
+
+    if command -v starman >/dev/null 2>&1; then
+        if systemctl is-active --quiet otobo-starman 2>/dev/null; then
+            register_diagnosis "Starman" "PASS" "Starman is running"
+        else
+            issues="${issues}Starman not running; "
+        fi
+    fi
+
+    if [[ -n "$issues" ]]; then
+        register_diagnosis "Nginx" "WARN" "${issues%%; }"
+        warning "nginx issues found: ${issues%%; }"
+    else
+        register_diagnosis "Nginx" "PASS" "Running, OTOBO site configured, config valid"
+        success "nginx is healthy."
     fi
 }
 
@@ -335,6 +395,14 @@ diagnose_forbidden() {
 
 repair_apache() {
     local idx="$1"
+    local ws
+    ws=$(detect_webserver)
+
+    if [[ "$ws" == "nginx" ]]; then
+        repair_nginx "$idx"
+        return
+    fi
+
     info "Repairing Apache..."
 
     if ! systemctl is-active --quiet apache2 2>/dev/null; then
@@ -357,6 +425,39 @@ repair_apache() {
 
     register_repair "$idx" "FIXED" "Apache started, site enabled, modules loaded, restarted"
     success "Apache repaired."
+}
+
+repair_nginx() {
+    local idx="$1"
+    info "Repairing nginx..."
+
+    if ! systemctl is-active --quiet nginx 2>/dev/null; then
+        systemctl start nginx || true
+    fi
+
+    if [[ ! -f /etc/nginx/sites-available/otobo ]]; then
+        cp /opt/otobo/scripts/apache2-httpd.include.conf /etc/nginx/sites-available/otobo 2>/dev/null || true
+    fi
+
+    if [[ -L /etc/nginx/sites-enabled/default ]]; then
+        rm -f /etc/nginx/sites-enabled/default
+    fi
+
+    if [[ ! -L /etc/nginx/sites-enabled/otobo ]]; then
+        ln -sf /etc/nginx/sites-available/otobo /etc/nginx/sites-enabled/
+    fi
+
+    nginx -t >/dev/null 2>&1 || true
+    systemctl restart nginx || true
+
+    if command -v starman >/dev/null 2>&1; then
+        if ! systemctl is-active --quiet otobo-starman 2>/dev/null; then
+            systemctl start otobo-starman || true
+        fi
+    fi
+
+    register_repair "$idx" "FIXED" "nginx started, site enabled, config reloaded"
+    success "nginx repaired."
 }
 
 repair_mariadb() {

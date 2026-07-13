@@ -304,7 +304,16 @@ swap_directories() {
 restart_services() {
     info "Restarting services..."
 
-    systemctl restart apache2 2>/dev/null || true
+    if command -v nginx >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+        systemctl restart nginx 2>/dev/null || true
+    else
+        systemctl restart apache2 2>/dev/null || true
+    fi
+
+    if command -v starman >/dev/null 2>&1; then
+        systemctl restart otobo-starman 2>/dev/null || true
+    fi
+
     systemctl restart otobo-daemon 2>/dev/null || true
     systemctl restart otobo-web 2>/dev/null || true
 
@@ -403,7 +412,11 @@ rollback() {
         info "Database restored from backup."
     fi
 
-    systemctl restart apache2 2>/dev/null || true
+    if command -v nginx >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+        systemctl restart nginx 2>/dev/null || true
+    else
+        systemctl restart apache2 2>/dev/null || true
+    fi
     systemctl restart otobo-daemon 2>/dev/null || true
     systemctl restart otobo-web 2>/dev/null || true
 

@@ -94,27 +94,155 @@ check_root() {
     fi
 }
 
+detect_webserver() {
+    if command -v nginx >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+        WEB_SERVER="nginx"
+    elif command -v apache2 >/dev/null 2>&1; then
+        WEB_SERVER="apache"
+    else
+        WEB_SERVER=""
+    fi
+}
+
 check_prerequisites() {
     info "Checking prerequisites..."
 
-    if ! command -v apache2 >/dev/null 2>&1; then
-        register_result "Prerequisites" "FAIL" "Apache is not installed"
-        error "Apache is not installed. Run install.sh first."
-    fi
+    detect_webserver
 
-    if ! a2query -m ssl >/dev/null 2>&1; then
-        a2enmod ssl >/dev/null 2>&1
-        register_result "Prerequisites" "INFO" "Apache SSL module enabled"
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        if [[ ! -f /etc/nginx/sites-available/otobo ]]; then
+            register_result "Prerequisites" "FAIL" "nginx OTOBO site not configured"
+            error "nginx OTOBO configuration not found. Run install.sh first."
+        fi
+        success "nginx detected."
+    elif [[ "$WEB_SERVER" == "apache" ]]; then
+        if ! a2query -m ssl >/dev/null 2>&1; then
+            a2enmod ssl >/dev/null 2>&1
+            register_result "Prerequisites" "INFO" "Apache SSL module enabled"
+        fi
+        success "Apache detected."
+    else
+        register_result "Prerequisites" "FAIL" "No web server detected"
+        error "No supported web server found. Run install.sh first."
     fi
 
     register_result "Prerequisites" "PASS" "All prerequisites met"
     success "Prerequisites verified."
 }
 
+ssl_restart_webserver() {
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        systemctl restart nginx
+        if systemctl is-active --quiet nginx; then
+            register_result "Restart" "PASS" "nginx restarted with HTTPS"
+            success "nginx restarted with HTTPS."
+        else
+            register_result "Restart" "FAIL" "nginx failed to start"
+            error "nginx failed to start after SSL configuration."
+        fi
+    else
+        systemctl restart apache2
+        if systemctl is-active --quiet apache2; then
+            register_result "Restart" "PASS" "Apache restarted with HTTPS"
+            success "Apache restarted with HTTPS."
+        else
+            register_result "Restart" "FAIL" "Apache failed to start"
+            error "Apache failed to start after SSL configuration."
+        fi
+    fi
+}
+
+ssl_test_https() {
+    local server_ip="$1"
+    if curl -s -o /dev/null -w "%{http_code}" "https://${server_ip}/otobo/installer.pl" -k 2>/dev/null | grep -qE '200|302'; then
+        register_result "HTTPS" "PASS" "HTTPS reachable on ${server_ip}"
+        success "HTTPS is working."
+    else
+        register_result "HTTPS" "WARN" "HTTPS not responding on ${server_ip}"
+        warning "HTTPS may not be working. Check web server logs."
+    fi
+}
+
+setup_self_signed_apache() {
+    local cert_file="$1"
+    local key_file="$2"
+    local server_ip="$3"
+    local ssl_conf="/etc/apache2/sites-available/zzz_otobo-ssl.conf"
+
+    cat >"$ssl_conf" <<-EOF
+		<VirtualHost *:443>
+		    ServerName ${server_ip}
+
+		    SSLEngine on
+		    SSLCertificateFile ${cert_file}
+		    SSLCertificateKeyFile ${key_file}
+
+		    Include /etc/apache2/sites-available/zzz_otobo.conf
+		</VirtualHost>
+
+		<VirtualHost *:80>
+		    ServerName ${server_ip}
+		    Redirect permanent / https://${server_ip}/
+		</VirtualHost>
+	EOF
+
+    a2ensite zzz_otobo-ssl >/dev/null 2>&1
+
+    if ! apache2ctl configtest 2>/dev/null; then
+        register_result "ApacheSSL" "FAIL" "Apache config syntax error"
+        error "Apache configuration syntax error. Check ${ssl_conf}"
+    fi
+    register_result "ApacheSSL" "PASS" "Apache SSL virtual host configured"
+}
+
+setup_self_signed_nginx() {
+    local cert_file="$1"
+    local key_file="$2"
+    local server_ip="$3"
+    local ssl_conf="/etc/nginx/sites-available/otobo-ssl"
+
+    cat >"$ssl_conf" <<-EOF
+		server {
+		    listen 443 ssl;
+		    server_name ${server_ip};
+
+		    ssl_certificate ${cert_file};
+		    ssl_certificate_key ${key_file};
+
+		    client_max_body_size 64M;
+		    proxy_read_timeout 120s;
+		    proxy_send_timeout 120s;
+
+		    location / {
+		        proxy_pass http://127.0.0.1:5000;
+		        proxy_set_header Host \$host;
+		        proxy_set_header X-Real-IP \$remote_addr;
+		        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+		        proxy_set_header X-Forwarded-Proto \$scheme;
+		    }
+		}
+
+		server {
+		    listen 80;
+		    server_name ${server_ip};
+		    return 301 https://\$server_name\$request_uri;
+		}
+	EOF
+
+    ln -sf "$ssl_conf" /etc/nginx/sites-enabled/
+
+    if ! nginx -t 2>/dev/null; then
+        register_result "NginxSSL" "FAIL" "nginx config syntax error"
+        error "nginx configuration syntax error. Check ${ssl_conf}"
+    fi
+    register_result "NginxSSL" "PASS" "nginx SSL server block configured"
+}
+
 setup_self_signed() {
+    detect_webserver
+
     local cert_file="/etc/ssl/certs/otobo-selfsigned.crt"
     local key_file="/etc/ssl/private/otobo-selfsigned.key"
-    local ssl_conf="/etc/apache2/sites-available/zzz_otobo-ssl.conf"
     local server_ip
 
     server_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -144,52 +272,16 @@ setup_self_signed() {
     register_result "SelfSigned" "PASS" "Self-signed certificate generated"
     success "Self-signed certificate created."
 
-    info "Configuring Apache for HTTPS..."
+    info "Configuring web server for HTTPS..."
 
-    cat >"$ssl_conf" <<-EOF
-		<VirtualHost *:443>
-		    ServerName ${server_ip}
-
-		    SSLEngine on
-		    SSLCertificateFile ${cert_file}
-		    SSLCertificateKeyFile ${key_file}
-
-		    Include /etc/apache2/sites-available/zzz_otobo.conf
-		</VirtualHost>
-
-		<VirtualHost *:80>
-		    ServerName ${server_ip}
-		    Redirect permanent / https://${server_ip}/
-		</VirtualHost>
-	EOF
-
-    a2ensite zzz_otobo-ssl >/dev/null 2>&1
-
-    if ! apache2ctl configtest 2>/dev/null; then
-        register_result "ApacheSSL" "FAIL" "Apache config syntax error"
-        error "Apache configuration syntax error. Check ${ssl_conf}"
-    fi
-
-    register_result "ApacheSSL" "PASS" "Apache SSL virtual host configured"
-    success "Apache SSL configuration created."
-
-    systemctl restart apache2
-
-    if systemctl is-active --quiet apache2; then
-        register_result "Restart" "PASS" "Apache restarted with HTTPS"
-        success "Apache restarted with HTTPS."
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        setup_self_signed_nginx "$cert_file" "$key_file" "$server_ip"
     else
-        register_result "Restart" "FAIL" "Apache failed to start"
-        error "Apache failed to start after SSL configuration."
+        setup_self_signed_apache "$cert_file" "$key_file" "$server_ip"
     fi
 
-    if curl -s -o /dev/null -w "%{http_code}" "https://localhost/otobo/installer.pl" -k 2>/dev/null | grep -qE '200|302'; then
-        register_result "HTTPS" "PASS" "HTTPS reachable on localhost"
-        success "HTTPS is working locally."
-    else
-        register_result "HTTPS" "WARN" "HTTPS not responding on localhost"
-        warning "HTTPS may not be working. Check Apache logs."
-    fi
+    ssl_restart_webserver
+    ssl_test_https "$server_ip"
 
     echo
     echo -e "${GREEN}============================================================${NC}"
@@ -276,9 +368,18 @@ setup_letsencrypt() {
     register_result "Certbot" "PASS" "Certbot installed"
     success "Certbot installed."
 
+    detect_webserver
+
     info "Obtaining Let's Encrypt certificate for ${domain}..."
 
-    if certbot --apache -d "$domain" --non-interactive --agree-tos \
+    local certbot_plugin="--apache"
+    local manual_hint="--apache"
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        certbot_plugin="--nginx"
+        manual_hint="--nginx"
+    fi
+
+    if certbot "$certbot_plugin" -d "$domain" --non-interactive --agree-tos \
         --email "admin@${domain}" --redirect 2>/dev/null; then
         register_result "Certificate" "PASS" "Let's Encrypt certificate obtained for ${domain}"
         success "Certificate obtained for ${domain}."
@@ -289,7 +390,7 @@ setup_letsencrypt() {
         warning "  - The domain does not point to this server"
         warning "  - Rate limits exceeded"
         echo
-        info "You can try manually: sudo certbot --apache -d ${domain}"
+        info "You can try manually: sudo certbot ${manual_hint} -d ${domain}"
         return
     fi
 
@@ -299,7 +400,11 @@ setup_letsencrypt() {
     register_result "Renewal" "PASS" "Certbot auto-renewal configured"
     success "Automatic renewal is enabled."
 
-    systemctl restart apache2
+    if [[ "$WEB_SERVER" == "nginx" ]]; then
+        systemctl restart nginx
+    else
+        systemctl restart apache2
+    fi
 
     if curl -s -o /dev/null -w "%{http_code}" "https://${domain}/otobo/installer.pl" 2>/dev/null | grep -qE '200|302'; then
         register_result "HTTPS" "PASS" "HTTPS reachable for ${domain}"
