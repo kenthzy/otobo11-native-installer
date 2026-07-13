@@ -2,4 +2,4 @@
 # https://www.shellcheck.net/wiki/
 
 # Cross-file variables from sourced modules (colors.sh, /etc/os-release, etc.)
-disable=SC2154,SC1091,SC1090
+disable=SC2154,SC1091,SC1090,SC2317
