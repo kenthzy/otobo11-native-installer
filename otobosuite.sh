@@ -33,10 +33,11 @@ show_menu() {
     echo "    3) Verify OTOBO           -- Post-install health check"
     echo "    4) Uninstall OTOBO        -- Remove OTOBO and components"
     echo "    5) Upgrade OTOBO          -- Download, migrate, rollback"
-    echo "    6) Configure SSL          -- Coming soon"
-    echo "    7) Exit"
+    echo "    6) Configure SSL          -- Let's Encrypt or self-signed"
+    echo "    7) Backup OTOBO           -- Full, partial, or schedule cron"
+    echo "    8) Exit"
     echo
-    read -rp " Enter your choice [1-7]: " choice
+    read -rp " Enter your choice [1-8]: " choice
     echo
 }
 
@@ -80,18 +81,15 @@ main() {
             3) run_script "verify.sh" "Verify OTOBO" ;;
             4) run_script "uninstall.sh" "Uninstall OTOBO" ;;
             5) run_script "upgrade.sh" "Upgrade OTOBO" ;;
-            6)
-                echo -e "${YELLOW}SSL/HTTPS configuration is coming soon.${NC}"
-                echo
-                read -rp "Press Enter to return to menu..."
-                ;;
-            7)
+            6) run_script "lib/ssl.sh" "Configure SSL/HTTPS" ;;
+            7) run_script "lib/backup.sh" "Backup OTOBO" ;;
+            8)
                 echo -e "${GREEN}Goodbye.${NC}"
                 echo
                 exit 0
                 ;;
             *)
-                echo -e "${RED}Invalid choice. Please enter 1-7.${NC}"
+                echo -e "${RED}Invalid choice. Please enter 1-8.${NC}"
                 echo
                 read -rp "Press Enter to continue..."
                 ;;
