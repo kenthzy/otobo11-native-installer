@@ -12,13 +12,23 @@ install_otobo() {
 	local otobo_base_url="${OTOBO_DOWNLOAD_URL:-https://github.com/RotherOSS/otobo/archive/refs/tags}"
 	local url="${otobo_base_url}/${tag}.tar.gz"
 
-	if [ ! -f "/tmp/${tarball}" ]; then
-		wget -q "$url" -O "/tmp/${tarball}" || die "Failed to download OTOBO"
-	fi
+	rm -f "/tmp/${tarball}"
+	wget -q "$url" -O "/tmp/${tarball}" || die "Failed to download OTOBO"
 
 	info "Extracting OTOBO to $otobo_root..."
-	tar xzf "/tmp/${tarball}" -C /tmp
-	mv /tmp/otobo-* "$otobo_root"
+	local tmp_extract="/tmp/otobo-extract-$$"
+	mkdir -p "$tmp_extract"
+	tar xzf "/tmp/${tarball}" -C "$tmp_extract"
+
+	local extracted
+	extracted=$(find "$tmp_extract" -maxdepth 1 -type d ! -name "$tmp_extract" | head -1)
+	if [ -z "$extracted" ]; then
+		rm -rf "$tmp_extract"
+		die "No extracted OTOBO directory found in tarball"
+	fi
+
+	mv "$extracted" "$otobo_root"
+	rm -rf "$tmp_extract"
 
 	useradd -r -d "$otobo_root" -s /bin/bash "$otobo_user" 2>/dev/null || true
 	set_otobo_permissions "$otobo_root" "$otobo_user" "$otobo_group"
