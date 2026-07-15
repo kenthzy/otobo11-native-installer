@@ -28,7 +28,7 @@ detect_os() {
 	ubuntu | debian)
 		PKG_MANAGER="apt"
 		PKG_UPDATE="apt-get update"
-		PKG_INSTALL="DEBCONF_FRONTEND=noninteractive apt-get install -y"
+		PKG_INSTALL="apt-get install -y"
 		PKG_REMOVE="apt-get remove -y"
 		;;
 	*)
@@ -70,7 +70,7 @@ pkg_install() {
 		die "Unsupported OS: $OS_NAME"
 	fi
 	pkg_init_proxy
-	$PKG_INSTALL "${APT_PROXY_OPTS[@]}" "$@" || die "Failed to install packages: $*"
+	DEBCONF_FRONTEND=noninteractive $PKG_INSTALL "${APT_PROXY_OPTS[@]}" "$@" || die "Failed to install packages: $*"
 }
 
 pkg_remove() {
