@@ -22,7 +22,11 @@ setup_python_env() {
 		curl -LsSf https://astral.sh/uv/install.sh | sh || {
 			warn "uv install via script failed, falling back to pip"
 		}
-		export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+		if [ -f "$HOME/.local/bin/uv" ]; then
+			cp "$HOME/.local/bin/uv" /usr/local/bin/uv 2>/dev/null || true
+			chmod 755 /usr/local/bin/uv 2>/dev/null || true
+		fi
+		export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 		if ! command -v uv &>/dev/null; then
 			pip3 install uv || warn "uv pip install failed"
 		fi
