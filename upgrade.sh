@@ -15,6 +15,7 @@ source "$SCRIPT_DIR/lib/deb.sh"
 # shellcheck source=lib/apt_repo.sh
 source "$SCRIPT_DIR/lib/apt_repo.sh"
 
+# shellcheck disable=SC2119
 load_config
 
 UPGRADE_VERSION=""
@@ -405,6 +406,7 @@ run_backup
 
 if [ "$UPGRADE_APT" -eq 1 ]; then
 	info "Upgrading OTOBO via apt..."
+	# shellcheck disable=SC2119
 	apt_repo_upgrade_otobo
 else
 	UPGRADE_STEP="download"

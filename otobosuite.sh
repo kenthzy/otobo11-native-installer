@@ -30,6 +30,7 @@ handle_backup_menu() {
 	source "$SCRIPT_DIR/lib/backup.sh"
 	# shellcheck source=lib/config.sh
 	source "$SCRIPT_DIR/lib/config.sh"
+	# shellcheck disable=SC2119
 	load_config
 
 	echo ""
@@ -83,6 +84,7 @@ handle_ssl_menu() {
 	source "$SCRIPT_DIR/lib/config.sh"
 	# shellcheck source=lib/ssl.sh
 	source "$SCRIPT_DIR/lib/ssl.sh"
+	# shellcheck disable=SC2119
 	load_config
 
 	echo ""
@@ -121,6 +123,7 @@ handle_security_menu() {
 	# shellcheck source=lib/security.sh
 	source "$SCRIPT_DIR/lib/pkg.sh"
 	source "$SCRIPT_DIR/lib/security.sh"
+	# shellcheck disable=SC2119
 	load_config
 
 	echo ""
@@ -220,6 +223,7 @@ handle_ai_menu() {
 	source "$SCRIPT_DIR/lib/ai.sh"
 	# shellcheck source=lib/ai_tune.sh
 	source "$SCRIPT_DIR/lib/ai_tune.sh"
+	# shellcheck disable=SC2119
 	load_config
 
 	echo ""

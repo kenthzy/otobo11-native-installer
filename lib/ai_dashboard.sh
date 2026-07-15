@@ -3,6 +3,7 @@
 OTAI_DASHBOARD_DIR="/opt/open-ticket-ai/dashboard"
 OTAI_DASHBOARD_FILE="${OTAI_DASHBOARD_DIR}/index.html"
 
+# shellcheck disable=SC2120
 collect_model_stats() {
 	local model_dir="${1:-/opt/open-ticket-ai/models}"
 	local output="${2:-${OTAI_DASHBOARD_DIR}/model_stats.json}"
@@ -36,6 +37,7 @@ with open('$output', 'w') as f:
 	register_result "ModelStats" "OK" "Model statistics collected"
 }
 
+# shellcheck disable=SC2120
 collect_prediction_stats() {
 	local log_file="${1:-/var/log/open-ticket-ai/otai.log}"
 	local output="${2:-${OTAI_DASHBOARD_DIR}/prediction_stats.json}"
@@ -85,6 +87,7 @@ with open('$output', 'w') as f:
 	register_result "PredictionStats" "OK" "Prediction statistics collected"
 }
 
+# shellcheck disable=SC2120
 collect_queue_stats() {
 	local otobo_root="${1:-/opt/otobo}"
 	local output="${2:-${OTAI_DASHBOARD_DIR}/queue_stats.json}"
@@ -269,8 +272,11 @@ HTML
 generate_dashboard() {
 	info "Generating AI dashboard..."
 
+	# shellcheck disable=SC2119
 	collect_model_stats
+	# shellcheck disable=SC2119
 	collect_prediction_stats
+	# shellcheck disable=SC2119
 	collect_queue_stats
 	generate_dashboard_html
 
