@@ -47,12 +47,12 @@ create_otai_dirs() {
 
 install_otai_packages() {
 	info "Installing Open Ticket AI Python packages..."
-	if command -v uv &>/dev/null; then
-		sudo -u "$OTAI_USER" uv venv "$OTAI_VENV_DIR" || die "Failed to create uv venv"
-		# shellcheck source=/dev/null
-		source "${OTAI_VENV_DIR}/bin/activate"
-		sudo -u "$OTAI_USER" uv pip install --system open-ticket-ai otai-otobo-znuny otai-hf-local || {
-			warn "uv install failed, falling back to pip3"
+	local uv_path
+	uv_path=$(command -v uv 2>/dev/null || echo "")
+	if [ -n "$uv_path" ]; then
+		sudo -u "$OTAI_USER" "$uv_path" venv "$OTAI_VENV_DIR" || die "Failed to create uv venv"
+		sudo -u "$OTAI_USER" "${OTAI_VENV_DIR}/bin/pip" install open-ticket-ai otai-otobo-znuny otai-hf-local || {
+			warn "pip install via uv venv failed, falling back to system pip3"
 			pip3 install open-ticket-ai otai-otobo-znuny otai-hf-local
 		}
 	else
