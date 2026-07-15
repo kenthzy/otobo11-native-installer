@@ -391,8 +391,8 @@ echo "  Database:       $DB_NAME"
 echo "  DB User:        $DB_USER"
 echo "  SSL:            $SSL_MODE"
 echo "  Install AI:     $INSTALL_AI"
-echo "  Hardening:      $INSTALL_HARDENING"
-echo "  Monitoring:     $INSTALL_MONITORING"
+echo "  Hardening:      ${INSTALL_HARDENING:-no}"
+echo "  Monitoring:     ${INSTALL_MONITORING:-no}"
 echo "========================================"
 
 if [[ "$UNATTENDED" -eq 0 ]]; then
