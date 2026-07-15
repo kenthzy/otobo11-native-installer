@@ -6,8 +6,10 @@ install_otobo() {
 	local otobo_group="$3"
 
 	info "Downloading OTOBO 11..."
-	local tarball="otobo-11.0.1.tar.gz"
-	local url="https://otobo.io/downloads/${tarball}"
+	local otobo_version="${OTOBO_VERSION:-11.0.16}"
+	local otobo_base_url="${OTOBO_DOWNLOAD_URL:-https://otobo.io/downloads}"
+	local tarball="otobo-${otobo_version}.tar.gz"
+	local url="${otobo_base_url}/${tarball}"
 
 	if [ ! -f "/tmp/${tarball}" ]; then
 		wget -q "$url" -O "/tmp/${tarball}" || die "Failed to download OTOBO"
