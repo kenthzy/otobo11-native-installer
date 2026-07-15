@@ -27,6 +27,7 @@ install_otobo() {
 		die "No extracted OTOBO directory found in tarball"
 	fi
 
+	rm -rf "$otobo_root"
 	mv "$extracted" "$otobo_root"
 	rm -rf "$tmp_extract"
 
