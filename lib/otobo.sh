@@ -21,7 +21,7 @@ install_otobo() {
 	tar xzf "/tmp/${tarball}" -C "$tmp_extract"
 
 	local extracted
-	extracted=$(find "$tmp_extract" -maxdepth 1 -type d ! -name "$tmp_extract" | head -1)
+	extracted=$(find "$tmp_extract" -maxdepth 1 -type d ! -path "$tmp_extract" | head -1)
 	if [ -z "$extracted" ]; then
 		rm -rf "$tmp_extract"
 		die "No extracted OTOBO directory found in tarball"

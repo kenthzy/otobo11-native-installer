@@ -32,6 +32,8 @@ source "$SCRIPT_DIR/lib/firewall.sh"
 source "$SCRIPT_DIR/lib/security.sh"
 # shellcheck source=lib/validation.sh
 source "$SCRIPT_DIR/lib/validation.sh"
+# shellcheck source=lib/permissions.sh
+source "$SCRIPT_DIR/lib/permissions.sh"
 # shellcheck source=lib/deb.sh
 source "$SCRIPT_DIR/lib/deb.sh"
 # shellcheck source=lib/apt_repo.sh
